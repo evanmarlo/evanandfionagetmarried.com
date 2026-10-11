@@ -2,80 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Evan & Fiona 5.22.27</title>
-<style>
-    /* Color Scheme */
-    /* Strawberry Cream #F4C3C4 */
-    /* Marigold #FDAC53 */
-    /* Pastel Yellow #F2E6B1 */
-    /* Butterfly #CADEA5 */
-    /* Spa Blue #D3DEDF */
-    /* Orchid Petal #BFB4CB */
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-
-  body {
-    font-family: sans-serif;
-  }
-
-  nav {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: center;
-    gap: 2rem;
-    padding: 1.5rem;
-    background: rgba(0, 0, 0, 0.2);
-    z-index: 10;
-  }
-
-  nav a {
-    color: white;
-    text-decoration: none;
-    font-size: 0.9rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  nav a:hover {
-    text-decoration: underline;
-  }
-
-  #home {
-    background-image: url('stocknature.jpg');
-    background-size: cover;
-    background-position: center;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: white;
-  }
-
-  #home h1 {
-    font-size: 3rem;
-    margin: 0.5rem 0;
-  }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
- <nav>
-    <a href="#home">Home</a>
-    <a href="#rsvp">RSVP</a>
-    <a href="#registry">Registry</a>
-  </nav>
-
-  <div id="home">
+  <header>
     <p>We're getting married!</p>
     <h1>Evan &amp; Fiona</h1>
     <p>5 · 22 · 2027</p>
+  </header>
+
+  <nav>
+    <a href="index.html" class="current">Home</a>
+    <a href="#rsvp">RSVP</a>
+    <a href="#registry">Registry</a>
+    <a href="faq.html">FAQ</a>
+  </nav>
+
+  <div id="home">
+    <img src="mainphoto.jpg" alt="Evan and Fiona">
   </div>
 </body>
 </html>
