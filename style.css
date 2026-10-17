@@ -91,16 +91,19 @@ nav a.current {
   height: 70vh;
   object-fit: cover;
   /* White scalloped frame: a white mat whose outer edge is cut into
-     half-circles (a row of circles plus a solid inner rectangle) */
+     half-circles (a row of circles plus a solid inner rectangle).
+     --tile-w/--tile-h are set by the page script to sizes that divide the
+     frame exactly, so every edge ends on a whole scallop (Safari ignores
+     the `round` repeat that would otherwise do this). */
   --scallop: 10px;
   padding: calc(var(--scallop) * 3);
   background: white;
   -webkit-mask:
     linear-gradient(#000 0 0) center / calc(100% - 2 * var(--scallop)) calc(100% - 2 * var(--scallop)) no-repeat,
-    radial-gradient(circle closest-side, #000 98%, transparent) 0 0 / calc(2 * var(--scallop)) calc(2 * var(--scallop)) round;
+    radial-gradient(circle closest-side, #000 98%, transparent) 0 0 / var(--tile-w, calc(2 * var(--scallop))) var(--tile-h, calc(2 * var(--scallop))) round;
   mask:
     linear-gradient(#000 0 0) center / calc(100% - 2 * var(--scallop)) calc(100% - 2 * var(--scallop)) no-repeat,
-    radial-gradient(circle closest-side, #000 98%, transparent) 0 0 / calc(2 * var(--scallop)) calc(2 * var(--scallop)) round;
+    radial-gradient(circle closest-side, #000 98%, transparent) 0 0 / var(--tile-w, calc(2 * var(--scallop))) var(--tile-h, calc(2 * var(--scallop))) round;
 }
 
 /* Scattered doodles (home page) */

@@ -36,6 +36,17 @@
 
   <div class="doodles" aria-hidden="true"></div>
 
+  <script>
+    // Size the photo frame's scallops so a whole number fits along each edge
+    // (Safari doesn't support the CSS `round` repeat that handles this elsewhere)
+    const framedPhoto = document.querySelector('#home img');
+    new ResizeObserver(() => {
+      const target = 2 * parseFloat(getComputedStyle(framedPhoto).getPropertyValue('--scallop'));
+      const w = framedPhoto.offsetWidth, h = framedPhoto.offsetHeight;
+      framedPhoto.style.setProperty('--tile-w', w / Math.max(1, Math.round(w / target)) + 'px');
+      framedPhoto.style.setProperty('--tile-h', h / Math.max(1, Math.round(h / target)) + 'px');
+    }).observe(framedPhoto);
+  </script>
   <script src="doodle-masks.js"></script>
   <script>
     // Scatters doodles randomly around the page, keeping clear of the text and photo
