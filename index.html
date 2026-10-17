@@ -4,14 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Evan & Fiona 5.22.27</title>
+<meta name="description" content="Evan and Fiona are getting married! May 22, 2027 in Pocatello, Idaho.">
+<meta property="og:title" content="Evan & Fiona are getting married!">
+<meta property="og:description" content="May 22, 2027 · Pocatello, Idaho">
+<meta property="og:image" content="https://evanandfionagetmarried.com/preview.jpg">
+<meta property="og:url" content="https://evanandfionagetmarried.com/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@400;500&display=swap">
 <link rel="stylesheet" href="style.css">
 <link rel="icon" type="image/png" href="favicon.ico">
 </head>
 <body>
   <header>
-    <p>We're getting married!</p>
+    <p class="intro">We're getting married!</p>
     <h1>Evan &amp; Fiona</h1>
-    <p>5 · 22 · 2027</p>
+    <p class="label">May 22, 2027 · Pocatello, ID</p>
   </header>
 
   <nav>
@@ -24,5 +33,186 @@
   <div id="home">
     <img src="mainphoto.jpg" alt="Evan and Fiona">
   </div>
+
+  <div class="doodles" aria-hidden="true"></div>
+
+  <script src="doodle-masks.js"></script>
+  <script>
+    // Scatters doodles randomly around the page, keeping clear of the text and photo
+    const doodles = [
+      { src: 'pink.png', color: 'pink' },
+      { src: 'blue.png', color: 'blue' },
+      { src: 'green.png', color: 'green' },
+      { src: 'yellow.png', color: 'yellow' },
+      { src: 'purple.png', color: 'purple' },
+      // These are drawn edge to edge in their image, so they're shrunk to match the others
+      { src: 'pineapple.png', color: 'yellow', scale: 0.85 },
+      { src: 'charm.png', color: 'pink', scale: 0.85 },
+      { src: 'lego.png', color: 'yellow', scale: 0.85 },
+      { src: 'egg.png', color: 'orange', scale: 0.85 },
+      { src: 'icecream.png', color: 'orange', scale: 0.85 }
+    ];
+    // Tiny doodles that fill the awkward gaps the grid leaves near the text, photo and edges
+    const fillers = ['star.png', 'heart.png', 'gem.png', 'flower.png'];
+    const container = document.querySelector('.doodles');
+
+    // Each doodle's silhouette as points relative to its center (-0.5 to 0.5 of its width)
+    const MASK_SIZE = 32;
+    const silhouettes = {};
+    for (const [src, hex] of Object.entries(DOODLE_MASKS)) {
+      const points = [];
+      [...hex].forEach((digit, i) => {
+        for (let bit = 0; bit < 4; bit++) {
+          if (!(parseInt(digit, 16) & (8 >> bit))) continue;
+          const k = i * 4 + bit;
+          points.push([(k % MASK_SIZE + 0.5) / MASK_SIZE - 0.5, (Math.floor(k / MASK_SIZE) + 0.5) / MASK_SIZE - 0.5]);
+        }
+      });
+      silhouettes[src] = points;
+    }
+
+    // Page-coordinate box around an element's actual text (not its full-width block)
+    function contentBox(el, pad) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const r = el.tagName === 'IMG' ? el.getBoundingClientRect() : range.getBoundingClientRect();
+      return {
+        left: r.left + scrollX - pad,
+        right: r.right + scrollX + pad,
+        top: r.top + scrollY - pad,
+        bottom: r.bottom + scrollY + pad
+      };
+    }
+
+    function scatterDoodles() {
+      const size = parseFloat(getComputedStyle(container).getPropertyValue('--doodle-size'));
+      container.style.height = '0';  // so the old doodles don't stretch the page measurement
+      const pageWidth = document.documentElement.clientWidth;
+      const pageHeight = document.documentElement.scrollHeight;
+      const textBoxes = [...document.querySelectorAll('header > *, nav')].map(el => contentBox(el, 12));
+      const photo = document.querySelector('#home img');
+      // Does a square of half-width `half` centered at (cx, cy) touch any of the boxes?
+      const overlaps = (boxes, cx, cy, half) => boxes.some(b =>
+        cx - half < b.right && cx + half > b.left &&
+        cy - half < b.bottom && cy + half > b.top);
+      const imgs = [];
+      const placed = [];
+
+      // A map of the page in 4px cells, marking where doodles are drawn
+      const cell = 4;
+      const margin = size;  // room for doodles hanging off the edges
+      const gridW = Math.ceil((pageWidth + 2 * margin) / cell);
+      const gridH = Math.ceil((pageHeight + 2 * margin) / cell);
+      const taken = new Uint8Array(gridW * gridH);
+
+      // Visits every map cell a doodle covers anywhere in its sway (tilt ± sway).
+      // Stops early and returns true if visit() does.
+      function eachCell(src, cx, cy, width, tilt, sway, visit) {
+        for (const step of [-1, -0.5, 0, 0.5, 1]) {
+          const a = (tilt + step * sway) * Math.PI / 180;
+          const cos = Math.cos(a), sin = Math.sin(a);
+          for (const [u, v] of silhouettes[src]) {
+            const gx = Math.floor((cx + (u * cos - v * sin) * width + margin) / cell);
+            const gy = Math.floor((cy + (u * sin + v * cos) * width + margin) / cell);
+            if (gx >= 0 && gy >= 0 && gx < gridW && gy < gridH && visit(gx, gy)) return true;
+          }
+        }
+        return false;
+      }
+
+      // Marks a doodle's cells (plus one cell of breathing room) as taken
+      function claim(src, cx, cy, width, tilt, sway) {
+        eachCell(src, cx, cy, width, tilt, sway, (gx, gy) => {
+          for (let dy = -1; dy <= 1; dy++)
+            for (let dx = -1; dx <= 1; dx++) {
+              const x = gx + dx, y = gy + dy;
+              if (x >= 0 && y >= 0 && x < gridW && y < gridH) taken[y * gridW + x] = 1;
+            }
+        });
+      }
+
+      function addDoodle(src, cx, cy, width, tilt) {
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = '';
+        img.style.left = cx - width / 2 + 'px';
+        img.style.top = cy - width / 2 + 'px';
+        img.style.width = img.style.height = width + 'px';
+        img.style.setProperty('--tilt', tilt + 'deg');
+        imgs.push(img);
+        return img;
+      }
+
+      const randomTilt = () => Math.round(Math.random() * 50 - 25);
+
+      // Staggered grid (every other row shifted half a step), centered on the page
+      // and extending past the edges so some doodles get cropped
+      // rowGap = colGap * √3/2 makes every neighbor (side and diagonal) the same distance apart
+      const colGap = size * 1.1;
+      const rowGap = colGap * 0.866;
+      const jitter = size * 0.04;  // small random nudge so it's not perfectly uniform
+      const startX = (pageWidth / 2) % colGap - colGap;
+      // The photo's box is shrunk inward so doodles can tuck partway behind its frame
+      const gridClear = [...textBoxes, contentBox(photo, -size * 0.3)];
+
+      for (let row = 0, y0 = size * 0.1; y0 < pageHeight + size / 2; row++, y0 += rowGap) {
+        const shift = row % 2 ? colGap / 2 : 0;
+        for (let x0 = startX + shift; x0 < pageWidth + size / 2; x0 += colGap) {
+          const cx = x0 + (Math.random() * 2 - 1) * jitter;
+          const cy = y0 + (Math.random() * 2 - 1) * jitter;
+          // The drawings don't fill their whole square, so only check the middle 80%
+          if (overlaps(gridClear, cx, cy, size * 0.4)) continue;
+
+          // Pick a random doodle whose color doesn't match any neighbor
+          const near = placed.filter(p => Math.hypot(p.cx - cx, p.cy - cy) < colGap * 1.6);
+          const options = [...doodles].sort(() => Math.random() - 0.5);
+          const pick = options.find(d => !near.some(p => p.color === d.color))
+            || options.find(d => !near.some(p => p.src === d.src))
+            || options[0];
+
+          const width = size * (pick.scale || 1);
+          const tilt = randomTilt();
+          placed.push({ cx, cy, color: pick.color, src: pick.src });
+          claim(pick.src, cx, cy, width, tilt, 5);  // big doodles sway ±5°
+          addDoodle(pick.src, cx, cy, width, tilt);
+        }
+      }
+
+      // Tiny fillers: tuck into any gap where their actual shape, through their
+      // whole sway, doesn't touch another doodle's shape
+      const tiny = size * 0.3;
+      const fillerClear = [...textBoxes, contentBox(photo, 0)];
+      const fillersPlaced = [];
+      for (let attempt = 0; attempt < 3000; attempt++) {
+        const cx = Math.random() * pageWidth;
+        const cy = Math.random() * pageHeight;
+        if (overlaps(fillerClear, cx, cy, tiny * 0.45 + 16)) continue;  // extra room so they don't crowd the text
+        if (fillersPlaced.some(p => Math.hypot(p.cx - cx, p.cy - cy) < tiny * 1.5)) continue;
+        const src = fillers[fillersPlaced.length % fillers.length];
+        const tilt = randomTilt();
+        if (eachCell(src, cx, cy, tiny, tilt, 15, (gx, gy) => taken[gy * gridW + gx])) continue;
+
+        fillersPlaced.push({ cx, cy });
+        claim(src, cx, cy, tiny, tilt, 15);  // tiny doodles sway ±15°
+        addDoodle(src, cx, cy, tiny, tilt).classList.add('tiny');
+      }
+
+      container.style.height = pageHeight + 'px';
+      container.replaceChildren(...imgs);
+    }
+
+    // Wait for the web fonts so the text is measured at its real size
+    document.fonts.ready.then(scatterDoodles);
+
+    // Re-scatter only when the width changes (phones fire resize while scrolling)
+    let lastWidth = innerWidth;
+    let resizeTimer;
+    addEventListener('resize', () => {
+      if (innerWidth === lastWidth) return;
+      lastWidth = innerWidth;
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(scatterDoodles, 200);
+    });
+  </script>
 </body>
 </html>
