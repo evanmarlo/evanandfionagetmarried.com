@@ -53,7 +53,22 @@ function textBox(el, pad) {
 
 const elementBox = (el, pad) => pageBox(el.getBoundingClientRect(), pad);
 
-function scatterDoodles() {
+// One full back-and-forth of the CSS `dance` animation (3.5s each way). Every doodle's
+// animation is offset by the page clock, so ones added later sway in step with the rest.
+const SWAY_CYCLE_SECONDS = 7;
+
+// What's placed so far, kept between layouts so a change to the page (like the
+// RSVP search results appearing) only adds or removes doodles where something
+// changed, instead of reshuffling the whole background
+let layoutWidth = null;     // page width the current layout was made for
+let layoutSize = null;      // doodle size the current layout was made for
+let gridOriginX = 0;        // where the grid's first column sits, kept so new doodles line up
+const gridDoodles = new Map(); // "row,col" → { cx, cy, src, color, width, tilt, img }
+let tinyDoodles = [];       // { cx, cy, src, tilt, img }
+let lastClear = [];         // areas kept clear last time
+let lastHeight = 0;
+
+function layoutDoodles() {
   const size = parseFloat(getComputedStyle(container).getPropertyValue('--doodle-size'));
   container.style.height = '0';  // so the old doodles don't stretch the page measurement
   const pageWidth = document.documentElement.clientWidth;
@@ -64,13 +79,38 @@ function scatterDoodles() {
   const textBoxes = [...document.querySelectorAll('header > *, nav')].map(el => textBox(el, 12));
   const mainBoxes = [...document.querySelectorAll('main')].map(el => elementBox(el, 24));
   const photo = document.querySelector('#home img');
+  // The photo's box is shrunk inward so big doodles can tuck partway behind its frame
+  const gridClear = [...textBoxes, ...mainBoxes, ...(photo ? [elementBox(photo, -size * 0.3)] : [])];
+  const fillerClear = [...textBoxes, ...mainBoxes, ...(photo ? [elementBox(photo, 0)] : [])];
 
   // Does a square of half-width `half` centered at (cx, cy) touch any of the boxes?
   const overlaps = (boxes, cx, cy, half) => boxes.some(b =>
     cx - half < b.right && cx + half > b.left &&
     cy - half < b.bottom && cy + half > b.top);
-  const imgs = [];
-  const placed = [];
+
+  // Staggered grid (every other row shifted half a step), centered on the page
+  // and extending past the edges so some doodles get cropped
+  // rowGap = colGap * √3/2 makes every neighbor (side and diagonal) the same distance apart
+  const colGap = size * 1.1;
+  const rowGap = colGap * 0.866;
+  const jitter = size * 0.04;  // small random nudge so it's not perfectly uniform
+
+  // A real change in width (resizing the window, rotating a phone) means a whole
+  // new layout. Small changes are ignored: on desktop, a scrollbar appearing or
+  // disappearing when content grows or shrinks narrows the page by ~15px, and that
+  // shouldn't reshuffle everything.
+  const fresh = layoutWidth === null || Math.abs(pageWidth - layoutWidth) > 40 || size !== layoutSize;
+  if (fresh) {
+    container.replaceChildren();
+    gridDoodles.clear();
+    tinyDoodles = [];
+    lastClear = [];
+    lastHeight = 0;
+    layoutWidth = pageWidth;
+    layoutSize = size;
+    gridOriginX = (pageWidth / 2) % colGap - colGap;
+  }
+  const added = [];
 
   // A map of the page in 4px cells, marking where doodles are drawn
   const cell = 4;
@@ -113,32 +153,44 @@ function scatterDoodles() {
     img.style.top = cy - width / 2 + 'px';
     img.style.width = img.style.height = width + 'px';
     img.style.setProperty('--tilt', tilt + 'deg');
-    imgs.push(img);
+    // Line the sway up with the page clock so it matches the doodles already there
+    const phase = -(performance.now() / 1000 % SWAY_CYCLE_SECONDS) + 's';
+    if (fresh) {
+      img.style.animationDelay = phase;
+    } else {
+      img.classList.add('appear');  // fades in (see style.css)
+      img.style.animationDelay = phase + ', 0s';
+    }
+    added.push(img);
     return img;
   }
 
   const randomTilt = () => Math.round(Math.random() * 50 - 25);
 
-  // Staggered grid (every other row shifted half a step), centered on the page
-  // and extending past the edges so some doodles get cropped
-  // rowGap = colGap * √3/2 makes every neighbor (side and diagonal) the same distance apart
-  const colGap = size * 1.1;
-  const rowGap = colGap * 0.866;
-  const jitter = size * 0.04;  // small random nudge so it's not perfectly uniform
-  const startX = (pageWidth / 2) % colGap - colGap;
-  // The photo's box is shrunk inward so doodles can tuck partway behind its frame
-  const gridClear = [...textBoxes, ...mainBoxes, ...(photo ? [elementBox(photo, -size * 0.3)] : [])];
+  const startX = gridOriginX;
+  const stillOnPage = new Set();
 
   for (let row = 0, y0 = size * 0.1; y0 < pageHeight + size / 2; row++, y0 += rowGap) {
     const shift = row % 2 ? colGap / 2 : 0;
-    for (let x0 = startX + shift; x0 < pageWidth + size / 2; x0 += colGap) {
+    for (let col = 0, x0 = startX + shift; x0 < pageWidth + size / 2; col++, x0 += colGap) {
+      const key = row + ',' + col;
+      // The drawings don't fill their whole square, so only check the middle 80%
+      const existing = gridDoodles.get(key);
+      if (existing) {
+        if (!overlaps(gridClear, existing.cx, existing.cy, size * 0.4)) {
+          stillOnPage.add(key);
+          continue;
+        }
+        existing.img.remove();  // content has moved over it
+        gridDoodles.delete(key);
+      }
+
       const cx = x0 + (Math.random() * 2 - 1) * jitter;
       const cy = y0 + (Math.random() * 2 - 1) * jitter;
-      // The drawings don't fill their whole square, so only check the middle 80%
       if (overlaps(gridClear, cx, cy, size * 0.4)) continue;
 
       // Pick a random doodle whose color doesn't match any neighbor
-      const near = placed.filter(p => Math.hypot(p.cx - cx, p.cy - cy) < colGap * 1.6);
+      const near = [...gridDoodles.values()].filter(p => Math.hypot(p.cx - cx, p.cy - cy) < colGap * 1.6);
       const options = [...doodles].sort(() => Math.random() - 0.5);
       const pick = options.find(d => !near.some(p => p.color === d.color))
         || options.find(d => !near.some(p => p.src === d.src))
@@ -146,44 +198,86 @@ function scatterDoodles() {
 
       const width = size * (pick.scale || 1);
       const tilt = randomTilt();
-      placed.push({ cx, cy, color: pick.color, src: pick.src });
-      claim(pick.src, cx, cy, width, tilt, 5);  // big doodles sway ±5°
-      addDoodle(pick.src, cx, cy, width, tilt);
+      const img = addDoodle(pick.src, cx, cy, width, tilt);
+      gridDoodles.set(key, { cx, cy, src: pick.src, color: pick.color, width, tilt, img });
+      stillOnPage.add(key);
     }
   }
+  // Rows past the bottom of a page that got shorter
+  for (const [key, doodle] of gridDoodles) {
+    if (!stillOnPage.has(key)) {
+      doodle.img.remove();
+      gridDoodles.delete(key);
+    }
+  }
+  gridDoodles.forEach(d => claim(d.src, d.cx, d.cy, d.width, d.tilt, 5));  // big doodles sway ±5°
 
   // Tiny fillers: tuck into any gap where their actual shape, through their
   // whole sway, doesn't touch another doodle's shape
   const tiny = size * 0.3;
-  const fillerClear = [...textBoxes, ...mainBoxes, ...(photo ? [elementBox(photo, 0)] : [])];
-  const fillersPlaced = [];
-  // More tries on bigger pages (the FAQ is several screens tall)
-  const attempts = Math.max(3000, Math.round(3000 * pageWidth * pageHeight / (1400 * 1100)));
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    const cx = Math.random() * pageWidth;
-    const cy = Math.random() * pageHeight;
-    if (overlaps(fillerClear, cx, cy, tiny * 0.45 + 16)) continue;  // extra room so they don't crowd the text
-    if (fillersPlaced.some(p => Math.hypot(p.cx - cx, p.cy - cy) < tiny * 1.5)) continue;
-    const src = fillers[fillersPlaced.length % fillers.length];
-    const tilt = randomTilt();
-    if (eachCell(src, cx, cy, tiny, tilt, 15, (gx, gy) => taken[gy * gridW + gx])) continue;
+  const crowdsContent = (cx, cy) => overlaps(fillerClear, cx, cy, tiny * 0.45 + 16);  // extra room around text
+  const hitsDoodle = (src, cx, cy, tilt) => eachCell(src, cx, cy, tiny, tilt, 15, (gx, gy) => taken[gy * gridW + gx]);
 
-    fillersPlaced.push({ cx, cy });
-    claim(src, cx, cy, tiny, tilt, 15);  // tiny doodles sway ±15°
-    addDoodle(src, cx, cy, tiny, tilt).classList.add('tiny');
+  // Keep the tiny doodles that still fit
+  tinyDoodles = tinyDoodles.filter(t => {
+    const fits = t.cy < pageHeight && !crowdsContent(t.cx, t.cy) && !hitsDoodle(t.src, t.cx, t.cy, t.tilt);
+    if (fits) claim(t.src, t.cx, t.cy, tiny, t.tilt, 15);  // tiny doodles sway ±15°
+    else t.img.remove();
+    return fits;
+  });
+
+  // Only look for new spots where something changed: around content that moved,
+  // grew or shrank, and any new length at the bottom (or the whole page, the first time)
+  const boxKey = b => [b.left, b.top, b.right, b.bottom].map(Math.round).join(',');
+  const before = new Set(lastClear.map(boxKey));
+  const now = new Set(fillerClear.map(boxKey));
+  const regions = fresh
+    ? [{ left: 0, top: 0, right: pageWidth, bottom: pageHeight }]
+    : [...lastClear.filter(b => !now.has(boxKey(b))), ...fillerClear.filter(b => !before.has(boxKey(b)))]
+      .map(b => ({ left: b.left - size, top: b.top - size, right: b.right + size, bottom: b.bottom + size }));
+  if (!fresh && pageHeight > lastHeight) regions.push({ left: 0, top: lastHeight - size, right: pageWidth, bottom: pageHeight });
+  lastClear = fillerClear;
+  lastHeight = pageHeight;
+
+  const areas = regions
+    .map(r => ({ left: Math.max(0, r.left), top: Math.max(0, r.top), right: Math.min(pageWidth, r.right), bottom: Math.min(pageHeight, r.bottom) }))
+    .filter(r => r.right > r.left && r.bottom > r.top);
+  const totalArea = areas.reduce((sum, r) => sum + (r.right - r.left) * (r.bottom - r.top), 0);
+  // About 3000 tries per screenful
+  const attempts = Math.round(3000 * totalArea / (1400 * 1100));
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    // Pick an area in proportion to its size, then a random spot in it
+    let pickArea = Math.random() * totalArea, r = areas[0];
+    for (const a of areas) {
+      r = a;
+      pickArea -= (a.right - a.left) * (a.bottom - a.top);
+      if (pickArea <= 0) break;
+    }
+    const cx = r.left + Math.random() * (r.right - r.left);
+    const cy = r.top + Math.random() * (r.bottom - r.top);
+    if (crowdsContent(cx, cy)) continue;
+    if (tinyDoodles.some(t => Math.hypot(t.cx - cx, t.cy - cy) < tiny * 1.5)) continue;
+    const src = fillers[tinyDoodles.length % fillers.length];
+    const tilt = randomTilt();
+    if (hitsDoodle(src, cx, cy, tilt)) continue;
+
+    claim(src, cx, cy, tiny, tilt, 15);
+    const img = addDoodle(src, cx, cy, tiny, tilt);
+    img.classList.add('tiny');
+    tinyDoodles.push({ cx, cy, src, tilt, img });
   }
 
   container.style.height = pageHeight + 'px';
-  container.replaceChildren(...imgs);
+  container.append(...added);
   lastLayout = bodyLayout();
 }
 
-// Scatter once the page settles, and again whenever its content changes size:
-// a different window width, fonts loading, or parts of a page appearing or
-// disappearing (like the RSVP form's extra questions). Phones hiding their
+// Lay out once the page settles, and update whenever its content changes size:
+// a different window width (full new layout), fonts loading, or parts of a page
+// appearing or disappearing (like the RSVP search results). Phones hiding their
 // address bar while scrolling don't change the body's size, so they don't
-// cause a reshuffle. The doodles themselves are positioned absolutely, so
-// they never count toward the body's size.
+// trigger anything. The doodles themselves are positioned absolutely, so they
+// never count toward the body's size.
 const bodyLayout = () => document.body.offsetWidth + 'x' + document.body.offsetHeight;
 let lastLayout = '';
 let layoutTimer;
@@ -191,5 +285,5 @@ new ResizeObserver(() => {
   if (bodyLayout() === lastLayout) return;
   clearTimeout(layoutTimer);
   // Wait for the web fonts so the text is measured at its real size
-  layoutTimer = setTimeout(() => document.fonts.ready.then(scatterDoodles), 200);
+  layoutTimer = setTimeout(() => document.fonts.ready.then(layoutDoodles), 200);
 }).observe(document.body);

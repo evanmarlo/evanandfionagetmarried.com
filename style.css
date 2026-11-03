@@ -144,9 +144,19 @@ nav a.current {
   --sway: 15deg;
 }
 
+/* Doodles added after the page loads (when content changes size) fade in */
+.doodles img.appear {
+  animation: dance 3.5s ease-in-out infinite alternate, doodle-appear 0.8s ease-out;
+}
+
+@keyframes doodle-appear {
+  from { opacity: 0; }
+}
+
 /* Keep them still for visitors who've asked their device to reduce motion */
 @media (prefers-reduced-motion: reduce) {
-  .doodles img {
+  .doodles img,
+  .doodles img.appear {
     animation: none;
   }
 }
@@ -394,6 +404,7 @@ button.button:disabled {
   padding: 0.9rem 1.1rem;
   font: inherit;
   font-size: 1.25rem;
+  letter-spacing: 0.08em;  /* names are shown in capitals */
   text-align: left;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.55);
@@ -412,6 +423,7 @@ button.button:disabled {
 .result-plus {
   display: block;
   font-size: 1rem;
+  letter-spacing: 0.04em;
   font-style: italic;
   opacity: 0.8;
 }
@@ -429,6 +441,7 @@ button.button:disabled {
 .invitation-name {
   font-size: 1.8rem;
   font-weight: 400;
+  letter-spacing: 0.08em;  /* names are shown in capitals */
   line-height: 1.2;
   margin: 0.4rem 0 0.5rem;
 }

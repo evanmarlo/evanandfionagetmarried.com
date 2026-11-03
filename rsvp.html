@@ -193,11 +193,11 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'result';
-        button.textContent = inv.invitation;
+        button.textContent = inv.invitation.toUpperCase();
         if (inv.plusOne) {
           const plus = document.createElement('span');
           plus.className = 'result-plus';
-          plus.textContent = 'with ' + inv.plusOne;
+          plus.textContent = 'with ' + inv.plusOne.toUpperCase();
           button.append(plus);
         }
         button.addEventListener('click', () => chooseInvitation(inv));
@@ -215,9 +215,9 @@
       form.invitation.value = inv.invitation;
       form.by.value = findInput.value.trim();
 
-      form.querySelector('.invitation-name').textContent = inv.invitation;
+      form.querySelector('.invitation-name').textContent = inv.invitation.toUpperCase();
       let seatText = seats === 1 ? 'We’ve saved a seat for you' : `We’ve saved ${seats} seats for you`;
-      if (inv.plusOne) seatText += `, including your guest, ${inv.plusOne}`;
+      if (inv.plusOne) seatText += `, including your guest, ${inv.plusOne.toUpperCase()}`;
       form.querySelector('.invitation-seats').textContent = seatText + '.';
       form.querySelector('.already-responded').hidden = !inv.responded;
 
@@ -271,7 +271,7 @@
         const typedWords = form.by.value.trim().split(/\s+/);
         const firstName = typedWords.length > 1
           ? typedWords[0].charAt(0).toUpperCase() + typedWords[0].slice(1)
-          : form.invitation.value;
+          : form.invitation.value.toUpperCase();
         const thanks = document.querySelector('.thanks');
         if (form.attending.value === 'yes') {
           thanks.querySelector('h3').textContent = `Thank you, ${firstName}!`;
