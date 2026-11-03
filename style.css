@@ -191,6 +191,19 @@ main h2 {
   color: var(--bg);
 }
 
+/* Venmo QR code under the button */
+.venmo-qr {
+  width: 220px;
+  margin: 2.5rem auto 0;
+}
+
+.venmo-qr img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+}
+
 /* FAQ page */
 #faq {
   max-width: 700px;
@@ -200,6 +213,15 @@ main h2 {
 
 #faq h2 {
   margin-bottom: 2.5rem;
+}
+
+/* Little emblem between the heading and the first question */
+#faq .faq-mark {
+  display: block;
+  width: 340px;
+  max-width: 75%;
+  height: auto;
+  margin: -3.5rem auto 1.5rem;  /* the image has empty space above the drawing */
 }
 
 .question {
@@ -213,4 +235,43 @@ main h2 {
 
 .question p {
   line-height: 1.7;
+}
+
+/* Space between paragraphs, lists and labels within an answer */
+.question > :not(h3) + * {
+  margin-top: 0.9rem;
+}
+
+/* A small label sits close to the text it introduces */
+.question > .label + * {
+  margin-top: 0.3rem;
+}
+
+.question a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.question .dress-code {
+  font-style: italic;
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+
+/* Venue and hotel list: name over a tappable map link */
+.places {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));  /* auto-fit lets a lone item use the full width */
+  gap: 1rem 2rem;
+}
+
+.places li {
+  line-height: 1.5;
+}
+
+.place-name {
+  display: block;
+  font-weight: 500;
 }
