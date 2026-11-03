@@ -66,11 +66,20 @@ nav {
 }
 
 nav a {
+  position: relative;
   color: var(--ink);
   text-decoration: none;
   padding-bottom: 0.3rem;
   border-bottom: 1px solid transparent;
   transition: border-color 0.2s;
+}
+
+/* Invisible padding around each link so it's easier to tap on a phone,
+   without moving the underline or changing the spacing */
+nav a::before {
+  content: '';
+  position: absolute;
+  inset: -0.75rem -0.6rem;
 }
 
 nav a:hover,
@@ -168,6 +177,69 @@ main h2 {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-align: center;
+}
+
+/* Home page: countdown under the date, and the RSVP button under the photo */
+header .countdown {
+  margin-top: 0.5rem;
+}
+
+.home-cta {
+  width: fit-content;
+  margin: -1rem auto 4rem;
+  text-align: center;
+}
+
+.home-cta .button {
+  margin-top: 0;
+}
+
+.home-cta p {
+  margin-top: 0.9rem;
+  font-style: italic;
+}
+
+/* Footer on every page */
+footer {
+  width: fit-content;
+  max-width: calc(100% - 2rem);
+  margin: 0 auto 2.5rem;
+  text-align: center;
+}
+
+footer img {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 0.6rem;
+}
+
+footer .label {
+  font-size: 0.72rem;
+  line-height: 1.8;
+}
+
+/* On phones, put the names and the date/place on their own lines */
+@media (max-width: 600px) {
+  footer .label span {
+    display: block;
+  }
+
+  footer .label .dot {
+    display: none;
+  }
+}
+
+/* "Page not found" page */
+#not-found {
+  max-width: 600px;
+  margin: 2rem auto 5rem;
+  padding: 0 1rem;
+  text-align: center;
+}
+
+#not-found h2 {
+  margin-bottom: 1.2rem;
 }
 
 /* Registry page */

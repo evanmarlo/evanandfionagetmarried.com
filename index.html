@@ -13,14 +13,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css">
+<!-- After changing style.css or the doodle scripts, bump ?v= on them (in every page) so browsers load the new version right away -->
+<link rel="stylesheet" href="style.css?v=2">
 <link rel="icon" type="image/png" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
 <body>
   <header>
     <p class="intro">We're getting married!</p>
     <h1>Evan &amp; Fiona</h1>
     <p class="label">May 22, 2027 · Pocatello, ID</p>
+    <p class="label countdown" hidden></p>
   </header>
 
   <nav>
@@ -34,9 +37,32 @@
     <img src="mainphoto.jpg" alt="Evan and Fiona">
   </div>
 
+  <div class="home-cta">
+    <a class="button" href="/rsvp">RSVP</a>
+    <p>Kindly respond by April 22nd, 2027</p>
+  </div>
+
+  <footer>
+    <img src="heart.png" alt="">
+    <p class="label"><span>Evan &amp; Fiona</span><span class="dot"> · </span><span>May 22, 2027 · Pocatello, ID</span></p>
+  </footer>
+
   <div class="doodles" aria-hidden="true"></div>
 
   <script>
+    // Countdown to the wedding, counted in calendar days from the visitor's today
+    const weddingDay = new Date(2027, 4, 22);  // months count from 0, so 4 is May
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysToGo = Math.round((weddingDay - today) / 86400000);
+    const countdown = document.querySelector('.countdown');
+    if (daysToGo >= 0) {
+      countdown.textContent = daysToGo > 1 ? `${daysToGo} days to go!`
+        : daysToGo === 1 ? '1 day to go!'
+        : 'Today’s the day!';
+      countdown.hidden = false;
+    }
+
     // Size the photo frame's scallops so a whole number fits along each edge
     // (Safari doesn't support the CSS `round` repeat that handles this elsewhere)
     const framedPhoto = document.querySelector('#home img');
@@ -47,7 +73,7 @@
       framedPhoto.style.setProperty('--tile-h', h / Math.max(1, Math.round(h / target)) + 'px');
     }).observe(framedPhoto);
   </script>
-  <script src="doodle-masks.js"></script>
-  <script src="doodles.js"></script>
+  <script src="doodle-masks.js?v=2"></script>
+  <script src="doodles.js?v=2"></script>
 </body>
 </html>

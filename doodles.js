@@ -1,6 +1,10 @@
 // Scatters doodles around the page behind everything, keeping clear of the
-// header text, the page's main content and the home page photo.
+// header text, the page's main content, the footer and the home page photo.
 // Needs doodle-masks.js loaded first and a <div class="doodles"> on the page.
+
+// Doodle images are found next to this script, so they load from any page,
+// including the "page not found" page, which can appear at any address
+const DOODLE_FOLDER = new URL('.', document.currentScript.src);
 
 const doodles = [
   { src: 'pink.png', color: 'pink' },
@@ -44,14 +48,19 @@ function pageBox(r, pad) {
   };
 }
 
-// Box around an element's actual text (not its full-width block)
+// Box around an element's actual text (not its full-width block).
+// Null for hidden or empty elements, which take up no space.
 function textBox(el, pad) {
   const range = document.createRange();
   range.selectNodeContents(el);
-  return pageBox(range.getBoundingClientRect(), pad);
+  const r = range.getBoundingClientRect();
+  return r.width && r.height ? pageBox(r, pad) : null;
 }
 
-const elementBox = (el, pad) => pageBox(el.getBoundingClientRect(), pad);
+function elementBox(el, pad) {
+  const r = el.getBoundingClientRect();
+  return r.width && r.height ? pageBox(r, pad) : null;
+}
 
 // One full back-and-forth of the CSS `dance` animation (3.5s each way). Every doodle's
 // animation is offset by the page clock, so ones added later sway in step with the rest.
@@ -74,14 +83,15 @@ function layoutDoodles() {
   const pageWidth = document.documentElement.clientWidth;
   const pageHeight = document.documentElement.scrollHeight;
 
-  // What to keep clear of: the header text, each page's main content column
-  // (doodles sit behind it, so they'd show through the text), and the photo
+  // What to keep clear of: the header text, each page's main content column and
+  // other content blocks (doodles sit behind them, so they'd show through the
+  // text), and the photo
   const textBoxes = [...document.querySelectorAll('header > *, nav')].map(el => textBox(el, 12));
-  const mainBoxes = [...document.querySelectorAll('main')].map(el => elementBox(el, 24));
+  const mainBoxes = [...document.querySelectorAll('main, .home-cta, footer')].map(el => elementBox(el, 24));
   const photo = document.querySelector('#home img');
   // The photo's box is shrunk inward so big doodles can tuck partway behind its frame
-  const gridClear = [...textBoxes, ...mainBoxes, ...(photo ? [elementBox(photo, -size * 0.3)] : [])];
-  const fillerClear = [...textBoxes, ...mainBoxes, ...(photo ? [elementBox(photo, 0)] : [])];
+  const gridClear = [...textBoxes, ...mainBoxes, photo && elementBox(photo, -size * 0.3)].filter(Boolean);
+  const fillerClear = [...textBoxes, ...mainBoxes, photo && elementBox(photo, 0)].filter(Boolean);
 
   // Does a square of half-width `half` centered at (cx, cy) touch any of the boxes?
   const overlaps = (boxes, cx, cy, half) => boxes.some(b =>
@@ -147,7 +157,7 @@ function layoutDoodles() {
 
   function addDoodle(src, cx, cy, width, tilt) {
     const img = document.createElement('img');
-    img.src = src;
+    img.src = new URL(src, DOODLE_FOLDER).href;
     img.alt = '';
     img.style.left = cx - width / 2 + 'px';
     img.style.top = cy - width / 2 + 'px';
@@ -270,6 +280,7 @@ function layoutDoodles() {
   container.style.height = pageHeight + 'px';
   container.append(...added);
   lastLayout = bodyLayout();
+  lastWindowHeight = innerHeight;
 }
 
 // Lay out once the page settles, and update whenever its content changes size:
@@ -280,10 +291,23 @@ function layoutDoodles() {
 // never count toward the body's size.
 const bodyLayout = () => document.body.offsetWidth + 'x' + document.body.offsetHeight;
 let lastLayout = '';
+let lastWindowHeight = 0;
 let layoutTimer;
-new ResizeObserver(() => {
-  if (bodyLayout() === lastLayout) return;
+
+function scheduleLayout() {
   clearTimeout(layoutTimer);
   // Wait for the web fonts so the text is measured at its real size
   layoutTimer = setTimeout(() => document.fonts.ready.then(layoutDoodles), 200);
+}
+
+new ResizeObserver(() => {
+  if (bodyLayout() !== lastLayout) scheduleLayout();
 }).observe(document.body);
+
+// On pages shorter than the window, the doodles fill the window instead. A taller
+// or shorter window then changes the area to cover without changing the body's
+// size, so watch the window height for those pages too.
+addEventListener('resize', () => {
+  const pageFillsWindow = lastHeight <= lastWindowHeight + 1;
+  if (pageFillsWindow && Math.abs(innerHeight - lastWindowHeight) > 1) scheduleLayout();
+});
