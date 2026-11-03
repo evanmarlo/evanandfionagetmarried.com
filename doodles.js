@@ -175,17 +175,21 @@ function scatterDoodles() {
 
   container.style.height = pageHeight + 'px';
   container.replaceChildren(...imgs);
+  lastLayout = bodyLayout();
 }
 
-// Wait for the web fonts so the text is measured at its real size
-document.fonts.ready.then(scatterDoodles);
-
-// Re-scatter only when the width changes (phones fire resize while scrolling)
-let lastWidth = innerWidth;
-let resizeTimer;
-addEventListener('resize', () => {
-  if (innerWidth === lastWidth) return;
-  lastWidth = innerWidth;
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(scatterDoodles, 200);
-});
+// Scatter once the page settles, and again whenever its content changes size:
+// a different window width, fonts loading, or parts of a page appearing or
+// disappearing (like the RSVP form's extra questions). Phones hiding their
+// address bar while scrolling don't change the body's size, so they don't
+// cause a reshuffle. The doodles themselves are positioned absolutely, so
+// they never count toward the body's size.
+const bodyLayout = () => document.body.offsetWidth + 'x' + document.body.offsetHeight;
+let lastLayout = '';
+let layoutTimer;
+new ResizeObserver(() => {
+  if (bodyLayout() === lastLayout) return;
+  clearTimeout(layoutTimer);
+  // Wait for the web fonts so the text is measured at its real size
+  layoutTimer = setTimeout(() => document.fonts.ready.then(scatterDoodles), 200);
+}).observe(document.body);

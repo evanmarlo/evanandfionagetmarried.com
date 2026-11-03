@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RSVP · Evan & Fiona 5.22.27</title>
+<meta name="description" content="RSVP for Evan and Fiona's wedding, May 22, 2027 in Pocatello, Idaho.">
+<meta property="og:title" content="RSVP · Evan & Fiona's Wedding">
+<meta property="og:description" content="May 22, 2027 · Pocatello, Idaho">
+<meta property="og:image" content="https://evanandfionagetmarried.com/preview.jpg">
+<meta property="og:url" content="https://evanandfionagetmarried.com/rsvp.html">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" type="image/png" href="favicon.ico">
+</head>
+<body>
+  <header>
+    <p class="intro">We're getting married!</p>
+    <h1>Evan &amp; Fiona</h1>
+    <p class="label">May 22, 2027 · Pocatello, ID</p>
+  </header>
+
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="rsvp.html" class="current">RSVP</a>
+    <a href="registry.html">Registry</a>
+    <a href="faq.html">FAQ</a>
+  </nav>
+
+  <main id="rsvp">
+    <h2>RSVP</h2>
+    <p class="rsvp-deadline">Kindly respond by April 22nd, 2027</p>
+
+    <!-- Step 1: find the invitation. The guest list stays in the Google Sheet;
+         the script only sends back invitations matching a full name. -->
+    <form id="find-form" novalidate>
+      <div class="field">
+        <label class="label" for="find-name">Find your invitation</label>
+        <div class="search-row">
+          <input type="text" id="find-name" name="name" autocomplete="name" maxlength="100" placeholder="First and last name">
+          <button type="submit" class="button">Find</button>
+        </div>
+        <p class="hint">Enter your full name as it appears on your invitation.</p>
+      </div>
+      <p class="form-status" role="status"></p>
+      <div class="results" hidden>
+        <p class="label">Select your invitation</p>
+        <ul class="result-list"></ul>
+      </div>
+    </form>
+
+    <!-- Step 2: respond for the chosen invitation -->
+    <form id="rsvp-form" novalidate hidden>
+      <input type="hidden" name="action" value="rsvp">
+      <input type="hidden" name="invitation">
+      <input type="hidden" name="by">
+
+      <div class="invitation-card">
+        <p class="label">Your invitation</p>
+        <h3 class="invitation-name"></h3>
+        <p class="invitation-seats"></p>
+        <p class="already-responded" hidden>We already have your RSVP. Sending this again will update it.</p>
+        <button type="button" class="link-button search-again">Not you? Search again</button>
+      </div>
+
+      <fieldset class="field">
+        <legend class="label">Will you be attending?</legend>
+        <div class="choices">
+          <label class="choice">
+            <input type="radio" name="attending" value="yes">
+            <span>Accepts</span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="attending" value="no">
+            <span>Regretfully declines</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Only shown once someone says they're coming. It's a fieldset so it can be
+           disabled when they decline, which keeps anything typed here from being sent. -->
+      <fieldset class="if-attending" hidden disabled>
+        <!-- Party size only matters for invitations with more than one seat -->
+        <div class="if-party">
+          <div class="field">
+            <label class="label" for="guests">How many will be attending?</label>
+            <select id="guests" name="guests"></select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label" for="dietary">Please list any dietary restrictions</label>
+          <textarea id="dietary" name="dietary" maxlength="500" rows="2"></textarea>
+        </div>
+
+        <div class="field">
+          <label class="label" for="email">Email <span class="optional">(optional, for updates)</span></label>
+          <input type="email" id="email" name="email" autocomplete="email" maxlength="200">
+        </div>
+      </fieldset>
+
+      <!-- Spam trap: hidden from people, but bots fill it in -->
+      <div class="honeypot" aria-hidden="true">
+        <label for="website">Website</label>
+        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="button">Send RSVP</button>
+        <p class="form-status" role="status"></p>
+      </div>
+    </form>
+
+    <div class="thanks" hidden>
+      <h3></h3>
+      <p></p>
+    </div>
+  </main>
+
+  <div class="doodles" aria-hidden="true"></div>
+
+  <script>
+    // The Google Apps Script web app URL (ends in /exec) that searches the guest list and saves responses
+    const RSVP_URL = 'https://script.google.com/macros/s/AKfycbx5BWbBinAKBb0vIq8wGacfqwrONmPbcpRBqTGf58O-k248988tLZrJ4hOmYzRDJ_6ivQ/exec';
+
+    const findForm = document.querySelector('#find-form');
+    const findInput = document.querySelector('#find-name');
+    const findStatus = findForm.querySelector('.form-status');
+    const findButton = findForm.querySelector('button[type="submit"]');
+    const results = findForm.querySelector('.results');
+    const resultList = findForm.querySelector('.result-list');
+
+    const form = document.querySelector('#rsvp-form');
+    const attendingFields = form.querySelector('.if-attending');
+    const partyFields = form.querySelector('.if-party');
+    const statusLine = form.querySelector('.form-status');
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    let seats = 1;
+
+    function setStatus(line, message, isError) {
+      line.textContent = message;
+      line.classList.toggle('error', Boolean(isError));
+    }
+
+    // Sends a request to the Google Script and returns its JSON reply
+    async function callScript(fields) {
+      const response = await fetch(RSVP_URL, { method: 'POST', body: new URLSearchParams(fields) });
+      return response.json();
+    }
+
+    // ----- Step 1: search -----
+
+    findForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const name = findInput.value.trim();
+      results.hidden = true;
+      if (name.replace(/[^\p{L}]/gu, '').length < 2) {
+        findInput.focus();
+        return setStatus(findStatus, 'Please enter your name.', true);
+      }
+
+      setStatus(findStatus, 'Searching…');
+      findButton.disabled = true;
+      try {
+        const reply = await callScript({ action: 'search', name: name });
+        if (!reply.ok) {
+          const messages = {
+            'name': 'Please enter your name.',
+            'full-name': 'Please enter your first and last name.',
+            'too-many': 'Lots of guests share that name. Please enter your first and last name.',
+            'busy': 'Lots of people are searching right now. Please try again in a minute.'
+          };
+          return setStatus(findStatus, messages[reply.error] || 'Something went wrong. Please try again in a moment.', true);
+        }
+        if (!reply.results.length) {
+          return setStatus(findStatus, 'We couldn’t find an invitation under that name. Try your name exactly as it’s written on your invitation, or reach out to us (our numbers are on the FAQ page).', true);
+        }
+        setStatus(findStatus, '');
+        showResults(reply.results);
+      } catch (err) {
+        setStatus(findStatus, 'Something went wrong. Please try again in a moment.', true);
+      } finally {
+        findButton.disabled = false;
+      }
+    });
+
+    function showResults(invitations) {
+      resultList.replaceChildren(...invitations.map(inv => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'result';
+        button.textContent = inv.invitation;
+        if (inv.plusOne) {
+          const plus = document.createElement('span');
+          plus.className = 'result-plus';
+          plus.textContent = 'with ' + inv.plusOne;
+          button.append(plus);
+        }
+        button.addEventListener('click', () => chooseInvitation(inv));
+        const item = document.createElement('li');
+        item.append(button);
+        return item;
+      }));
+      results.hidden = false;
+    }
+
+    // ----- Step 2: respond -----
+
+    function chooseInvitation(inv) {
+      seats = inv.seats;
+      form.invitation.value = inv.invitation;
+      form.by.value = findInput.value.trim();
+
+      form.querySelector('.invitation-name').textContent = inv.invitation;
+      let seatText = seats === 1 ? 'We’ve saved a seat for you' : `We’ve saved ${seats} seats for you`;
+      if (inv.plusOne) seatText += `, including your guest, ${inv.plusOne}`;
+      form.querySelector('.invitation-seats').textContent = seatText + '.';
+      form.querySelector('.already-responded').hidden = !inv.responded;
+
+      // Party size choices, up to the seats on the invitation
+      form.guests.replaceChildren(...Array.from({ length: seats }, (_, i) => new Option(String(i + 1))));
+      form.guests.value = String(seats);
+
+      findForm.hidden = true;
+      form.hidden = false;
+      syncAttending();
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    form.querySelector('.search-again').addEventListener('click', () => {
+      form.hidden = true;
+      findForm.hidden = false;
+      findInput.focus();
+    });
+
+    // Show the attending questions only for guests who are coming, and the
+    // party questions only for invitations with more than one seat
+    function syncAttending() {
+      const coming = form.attending.value === 'yes';
+      attendingFields.hidden = !coming;
+      attendingFields.disabled = !coming;  // disabled fields aren't sent or validated
+      partyFields.hidden = seats < 2;
+    }
+    form.addEventListener('change', e => {
+      if (e.target.name === 'attending') syncAttending();
+    });
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      setStatus(statusLine, '');
+      if (!form.attending.value) return setStatus(statusLine, 'Please let us know if you can make it.', true);
+      if (form.email.value && !form.email.checkValidity()) {
+        form.email.focus();
+        return setStatus(statusLine, 'That email address doesn’t look quite right.', true);
+      }
+      // One-seat invitations don't show the party question
+      if (seats < 2) form.guests.value = '1';
+
+      submitButton.disabled = true;
+      submitButton.textContent = 'Sending…';
+      try {
+        const reply = await callScript(new FormData(form));
+        if (!reply.ok) throw new Error(reply.error);
+
+        // Thank them by first name, or by the invitation if they searched a single name
+        // (which might be a last name)
+        const typedWords = form.by.value.trim().split(/\s+/);
+        const firstName = typedWords.length > 1
+          ? typedWords[0].charAt(0).toUpperCase() + typedWords[0].slice(1)
+          : form.invitation.value;
+        const thanks = document.querySelector('.thanks');
+        if (form.attending.value === 'yes') {
+          thanks.querySelector('h3').textContent = `Thank you, ${firstName}!`;
+          thanks.querySelector('p').textContent = 'We can’t wait to celebrate with you on May 22nd.';
+        } else {
+          thanks.querySelector('h3').textContent = 'Thank you for letting us know.';
+          thanks.querySelector('p').hidden = true;
+        }
+        form.hidden = true;
+        thanks.hidden = false;
+      } catch (err) {
+        setStatus(statusLine, 'Something went wrong sending your RSVP. Please try again in a moment, or reach out to us (our numbers are on the FAQ page).', true);
+        submitButton.disabled = false;
+        submitButton.textContent = 'Send RSVP';
+      }
+    });
+  </script>
+  <script src="doodle-masks.js"></script>
+  <script src="doodles.js"></script>
+</body>
+</html>
