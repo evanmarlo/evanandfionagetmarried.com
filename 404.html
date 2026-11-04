@@ -3,6 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // First page of a visit: hide the page now, before anything shows, so it can fade
+  // in with the doodle burst (see doodles.js). Skipped for visitors who have asked
+  // their device to reduce motion.
+  try {
+    if (!sessionStorage.getItem("doodleBurstPlayed") && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      sessionStorage.setItem("doodleBurstPlayed", "1");
+      document.documentElement.classList.add("intro");
+      // Safety net: never leave the page hidden, even if something fails to load
+      setTimeout(() => document.documentElement.classList.remove("intro"), 6000);
+    }
+  } catch (err) {
+    // Storage can be blocked (some private browsing modes); the page just shows normally
+  }
+</script>
 <title>Page Not Found · Evan & Fiona 5.22.27</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,7 +26,7 @@
 <!-- GitHub Pages shows this page for any missing address (like /some/old/link),
      so every link here starts with / to load from the top of the site.
      After changing style.css or the doodle scripts, bump ?v= on them (in every page) so browsers load the new version right away -->
-<link rel="stylesheet" href="/style.css?v=4">
+<link rel="stylesheet" href="/style.css?v=7">
 <link rel="icon" type="image/png" href="/favicon.ico">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 </head>
@@ -42,7 +57,7 @@
 
   <div class="doodles" aria-hidden="true"></div>
 
-  <script src="/doodle-masks.js?v=4"></script>
-  <script src="/doodles.js?v=4"></script>
+  <script src="/doodle-masks.js?v=7"></script>
+  <script src="/doodles.js?v=7"></script>
 </body>
 </html>

@@ -3,6 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // First page of a visit: hide the page now, before anything shows, so it can fade
+  // in with the doodle burst (see doodles.js). Skipped for visitors who have asked
+  // their device to reduce motion.
+  try {
+    if (!sessionStorage.getItem("doodleBurstPlayed") && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      sessionStorage.setItem("doodleBurstPlayed", "1");
+      document.documentElement.classList.add("intro");
+      // Safety net: never leave the page hidden, even if something fails to load
+      setTimeout(() => document.documentElement.classList.remove("intro"), 6000);
+    }
+  } catch (err) {
+    // Storage can be blocked (some private browsing modes); the page just shows normally
+  }
+</script>
 <title>Evan & Fiona 5.22.27</title>
 <meta name="description" content="Evan and Fiona are getting married! May 22, 2027 in Pocatello, Idaho.">
 <meta property="og:title" content="Evan & Fiona are getting married!">
@@ -14,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@400;500&display=swap">
 <!-- After changing style.css or the doodle scripts, bump ?v= on them (in every page) so browsers load the new version right away -->
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=7">
 <link rel="icon" type="image/png" href="favicon.ico">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
@@ -37,10 +52,14 @@
     <img src="mainphoto.jpg" alt="Evan and Fiona">
   </div>
 
+  <div class="doodle-band" aria-hidden="true"></div>
+
   <div class="home-cta">
     <a class="button" href="/rsvp">RSVP</a>
     <p>Kindly respond by April 22nd, 2027</p>
   </div>
+
+  <div class="doodle-band" aria-hidden="true"></div>
 
   <footer>
     <img src="heart.png" alt="">
@@ -63,17 +82,37 @@
       countdown.hidden = false;
     }
 
-    // Size the photo frame's scallops so a whole number fits along each edge
-    // (Safari doesn't support the CSS `round` repeat that handles this elsewhere)
+    // Draws the photo frame's scalloped edge as one shape, sized exactly to the frame.
+    // (The CSS version repeats a small tile, and Safari rounds each tile to the
+    // screen's pixels, so on some iPhones the bumps drift and break apart.)
     const framedPhoto = document.querySelector('#home img');
-    new ResizeObserver(() => {
-      const target = 2 * parseFloat(getComputedStyle(framedPhoto).getPropertyValue('--scallop'));
+    function drawScallops() {
+      const r = parseFloat(getComputedStyle(framedPhoto).getPropertyValue('--scallop'));
       const w = framedPhoto.offsetWidth, h = framedPhoto.offsetHeight;
-      framedPhoto.style.setProperty('--tile-w', w / Math.max(1, Math.round(w / target)) + 'px');
-      framedPhoto.style.setProperty('--tile-h', h / Math.max(1, Math.round(h / target)) + 'px');
-    }).observe(framedPhoto);
+      if (!w || !h) return;
+      // A whole number of bumps along each edge, as close to the normal size as possible
+      const across = Math.max(1, Math.round(w / (2 * r)));
+      const down = Math.max(1, Math.round(h / (2 * r)));
+      const stepX = w / across, stepY = h / down;
+      const bump = Math.min(stepX, stepY) / 2;
+      const circle = (x, y) => `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${bump.toFixed(2)}"/>`;
+      const shapes = [`<rect x="${r}" y="${r}" width="${w - 2 * r}" height="${h - 2 * r}"/>`];
+      for (let i = 0; i < across; i++) {
+        const x = stepX * (i + 0.5);
+        shapes.push(circle(x, stepY / 2), circle(x, h - stepY / 2));
+      }
+      for (let j = 0; j < down; j++) {
+        const y = stepY * (j + 0.5);
+        shapes.push(circle(stepX / 2, y), circle(w - stepX / 2, y));
+      }
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${shapes.join('')}</svg>`;
+      const mask = `url("data:image/svg+xml,${encodeURIComponent(svg)}") 0 0 / 100% 100% no-repeat`;
+      framedPhoto.style.setProperty('-webkit-mask', mask);
+      framedPhoto.style.setProperty('mask', mask);
+    }
+    new ResizeObserver(drawScallops).observe(framedPhoto);
   </script>
-  <script src="doodle-masks.js?v=4"></script>
-  <script src="doodles.js?v=4"></script>
+  <script src="doodle-masks.js?v=7"></script>
+  <script src="doodles.js?v=7"></script>
 </body>
 </html>

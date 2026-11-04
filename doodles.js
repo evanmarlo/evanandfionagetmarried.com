@@ -74,6 +74,7 @@ let layoutWidth = null;     // page width the current layout was made for
 let layoutSize = null;      // doodle size the current layout was made for
 let gridOriginX = 0;        // where the grid's first column sits, kept so new doodles line up
 const gridDoodles = new Map(); // "row,col" → { cx, cy, src, color, width, tilt, img }
+const bandRows = new Map();    // band number → { at: its position, items: [same as gridDoodles] }
 let tinyDoodles = [];       // { cx, cy, src, tilt, img }
 let lastClear = [];         // areas kept clear last time
 let lastHeight = 0;
@@ -87,11 +88,32 @@ function layoutDoodles() {
   // What to keep clear of: the header text, each page's main content column and
   // other content blocks (doodles sit behind them, so they'd show through the
   // text), and the photo
-  const textBoxes = [...document.querySelectorAll('header > *, nav')].map(el => textBox(el, 12));
-  const mainBoxes = [...document.querySelectorAll('main, .home-cta, footer')].map(el => elementBox(el, 24));
+  const textBoxes = [...document.querySelectorAll('header > *, nav')].map(el => textBox(el, 12)).filter(Boolean);
+
+  // Doodle bands: strips set aside between sections on phones (see .doodle-band in
+  // style.css), each filled with its own row of doodles. Hidden ones take no space.
+  const bands = [...document.querySelectorAll('.doodle-band')].map(el => elementBox(el, 0)).filter(Boolean);
+  // A content box with any bands inside it (like the ones between FAQ questions) cut out
+  function withoutBands(box) {
+    const parts = [];
+    let top = box.top;
+    bands.filter(b => b.top >= box.top && b.bottom <= box.bottom)
+      .sort((a, b) => a.top - b.top)
+      .forEach(b => {
+        if (b.top > top) parts.push({ ...box, top, bottom: b.top });
+        top = b.bottom;
+      });
+    if (box.bottom > top) parts.push({ ...box, top, bottom: box.bottom });
+    return parts;
+  }
+
+  const mainBoxes = [...document.querySelectorAll('main, .home-cta, footer')]
+    .map(el => elementBox(el, 24)).filter(Boolean).flatMap(withoutBands);
   const photo = document.querySelector('#home img');
+  // The background grid stays out of the bands (they get their own rows), across the full width
+  const bandClear = bands.map(b => ({ left: -size, right: pageWidth + size, top: b.top - size * 0.15, bottom: b.bottom + size * 0.15 }));
   // The photo's box is shrunk inward so big doodles can tuck partway behind its frame
-  const gridClear = [...textBoxes, ...mainBoxes, photo && elementBox(photo, -size * 0.3)].filter(Boolean);
+  const gridClear = [...textBoxes, ...mainBoxes, ...bandClear, photo && elementBox(photo, -size * 0.3)].filter(Boolean);
   const fillerClear = [...textBoxes, ...mainBoxes, photo && elementBox(photo, 0)].filter(Boolean);
 
   // Does a square of half-width `half` centered at (cx, cy) touch any of the boxes?
@@ -114,6 +136,7 @@ function layoutDoodles() {
   if (fresh) {
     container.replaceChildren();
     gridDoodles.clear();
+    bandRows.clear();
     tinyDoodles = [];
     lastClear = [];
     lastHeight = 0;
@@ -178,6 +201,15 @@ function layoutDoodles() {
 
   const randomTilt = () => Math.round(Math.random() * 50 - 25);
 
+  // A random doodle whose color doesn't match any of the nearby ones already placed
+  function pickDoodle(cx, cy, others) {
+    const near = others.filter(p => Math.hypot(p.cx - cx, p.cy - cy) < colGap * 1.6);
+    const options = [...doodles].sort(() => Math.random() - 0.5);
+    return options.find(d => !near.some(p => p.color === d.color))
+      || options.find(d => !near.some(p => p.src === d.src))
+      || options[0];
+  }
+
   const startX = gridOriginX;
   const stillOnPage = new Set();
 
@@ -200,13 +232,7 @@ function layoutDoodles() {
       const cy = y0 + (Math.random() * 2 - 1) * jitter;
       if (overlaps(gridClear, cx, cy, size * 0.4)) continue;
 
-      // Pick a random doodle whose color doesn't match any neighbor
-      const near = [...gridDoodles.values()].filter(p => Math.hypot(p.cx - cx, p.cy - cy) < colGap * 1.6);
-      const options = [...doodles].sort(() => Math.random() - 0.5);
-      const pick = options.find(d => !near.some(p => p.color === d.color))
-        || options.find(d => !near.some(p => p.src === d.src))
-        || options[0];
-
+      const pick = pickDoodle(cx, cy, [...gridDoodles.values()]);
       const width = size * (pick.scale || 1);
       const tilt = randomTilt();
       const img = addDoodle(pick.src, cx, cy, width, tilt);
@@ -221,7 +247,46 @@ function layoutDoodles() {
       gridDoodles.delete(key);
     }
   }
-  gridDoodles.forEach(d => claim(d.src, d.cx, d.cy, d.width, d.tilt, 5));  // big doodles sway ±5°
+
+  // A row of doodles across each band, spaced like the background grid, with
+  // every other band shifted half a step (so its end doodles hang off the edges).
+  // A band that hasn't moved keeps its doodles.
+  const keptBands = new Set();
+  bands.forEach((band, i) => {
+    const at = Math.round(band.top) + ',' + Math.round(band.bottom);
+    const existing = bandRows.get(i);
+    if (existing && existing.at === at) {
+      keptBands.add(i);
+      return;
+    }
+    if (existing) existing.items.forEach(d => d.img.remove());
+
+    const count = Math.max(1, Math.round(pageWidth / colGap));
+    const gap = pageWidth / count;
+    const middle = (band.top + band.bottom) / 2;
+    const items = [];
+    for (let x = i % 2 ? 0 : gap / 2; x <= pageWidth; x += gap) {
+      const cx = x + (Math.random() * 2 - 1) * jitter;
+      const cy = middle + (Math.random() * 2 - 1) * jitter;
+      const pick = pickDoodle(cx, cy, [...items, ...gridDoodles.values()]);
+      const width = size * (pick.scale || 1);
+      const tilt = randomTilt();
+      const img = addDoodle(pick.src, cx, cy, width, tilt);
+      items.push({ cx, cy, src: pick.src, color: pick.color, width, tilt, img });
+    }
+    bandRows.set(i, { at, items });
+    keptBands.add(i);
+  });
+  for (const [i, row] of bandRows) {
+    if (!keptBands.has(i)) {
+      row.items.forEach(d => d.img.remove());
+      bandRows.delete(i);
+    }
+  }
+
+  // Big doodles sway ±5°
+  gridDoodles.forEach(d => claim(d.src, d.cx, d.cy, d.width, d.tilt, 5));
+  bandRows.forEach(row => row.items.forEach(d => claim(d.src, d.cx, d.cy, d.width, d.tilt, 5)));
 
   // Tiny fillers: tuck into any gap where their actual shape, through their
   // whole sway, doesn't touch another doodle's shape
@@ -315,77 +380,110 @@ addEventListener('resize', () => {
 
 // ---------- Welcome burst ----------
 
-// Doodles explode out from the names, spinning outward and fading off the edges,
-// while the background doodles fade in behind them
+// On the first page someone opens in a visit, a script at the top of the page
+// adds the "intro" class (which hides the page) before anything shows. Here,
+// doodles and sparkles explode out from the names, then the page and the
+// background doodles fade in together.
+
+const root = document.documentElement;
+
+// A four-pointed sparkle, drawn in the given color
+const sparkleShape = color =>
+  `<svg viewBox="0 0 24 24"><path fill="${color}" d="M12 0C12.9 7.6 16.4 11.1 24 12C16.4 12.9 12.9 16.4 12 24C11.1 16.4 7.6 12.9 0 12C7.6 11.1 11.1 7.6 12 0Z"/></svg>`;
+// Mostly gold, since white alone barely shows against the pink
+const SPARKLE_COLORS = ['#F5B942', '#F5B942', '#FFD166', '#E8A33D', '#ffffff', '#F4A6B5'];
+
 function playWelcomeBurst() {
   const names = document.querySelector('header h1');
   if (!names) return;
   const origin = names.getBoundingClientRect();
-  const originX = origin.left + origin.width / 2;
-  const originY = origin.top + origin.height / 2;
   const size = parseFloat(getComputedStyle(container).getPropertyValue('--doodle-size'));
   const screenDiagonal = Math.hypot(innerWidth, innerHeight);
 
   const layer = document.createElement('div');
   layer.className = 'doodle-burst';
   layer.setAttribute('aria-hidden', 'true');
+  const flights = [];
+
+  // Sends one piece flying out from somewhere across the names, then removes it
+  function launch(el, width, { reach, duration, delay, spin, keyframes }) {
+    const startX = origin.left + origin.width * (0.1 + Math.random() * 0.8);
+    const startY = origin.top + origin.height * (0.2 + Math.random() * 0.6);
+    el.style.width = el.style.height = width + 'px';
+    el.style.left = startX - width / 2 + 'px';
+    el.style.top = startY - width / 2 + 'px';
+    layer.append(el);
+
+    // A random direction, far enough to reach (or pass) the edge of the screen
+    const angle = Math.random() * Math.PI * 2;
+    const distance = screenDiagonal * reach;
+    const end = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px) scale(1) rotate(${spin}deg)`;
+    const flight = el.animate([
+      { transform: 'translate(0, 0) scale(0.2) rotate(0deg)', opacity: 0 },
+      ...keyframes,
+      { transform: end, opacity: 0 }
+    ], {
+      duration,
+      delay,
+      easing: 'cubic-bezier(0.25, 0.65, 0.35, 1)',  // a soft pop, then a long glide
+      // Hold the first frame while waiting to start and the last (invisible) frame
+      // once done; otherwise a finished piece snaps back to the middle
+      fill: 'both'
+    });
+    // Each piece leaves the page as soon as its own flight ends
+    flight.finished.then(() => el.remove(), () => el.remove());
+    flights.push(flight);
+  }
+
+  // Doodles
   const choices = [
     ...doodles.map(d => ({ src: d.src, width: size * (d.scale || 1) * 0.8 })),
     ...fillers.map(src => ({ src, width: size * 0.35 }))
   ];
-
-  const flights = [];
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < 140; i++) {
     const pick = choices[i % choices.length];
-    const width = pick.width * (0.7 + Math.random() * 0.5);
     const img = document.createElement('img');
     img.src = new URL(pick.src, DOODLE_FOLDER).href;
     img.alt = '';
-    img.style.width = img.style.height = width + 'px';
-    img.style.left = originX - width / 2 + 'px';
-    img.style.top = originY - width / 2 + 'px';
-    layer.append(img);
-
-    // A random direction, far enough to reach (or pass) the edge of the screen
-    const angle = Math.random() * Math.PI * 2;
-    const distance = screenDiagonal * (0.35 + Math.random() * 0.45);
-    const dx = Math.cos(angle) * distance;
-    const dy = Math.sin(angle) * distance;
-    const spin = (Math.random() * 2 - 1) * 360;
-    const flight = img.animate([
-      { transform: 'translate(0, 0) scale(0.2) rotate(0deg)', opacity: 0 },
-      { opacity: 1, offset: 0.06 },
-      { opacity: 1, offset: 0.7 },
-      { transform: `translate(${dx}px, ${dy}px) scale(1) rotate(${spin}deg)`, opacity: 0 }
-    ], {
-      duration: 2600 + Math.random() * 1000,
-      delay: Math.random() * 350,
-      easing: 'cubic-bezier(0.2, 0.75, 0.35, 1)',  // quick pop, then a long glide
-      // Hold the first frame while waiting to start and the last (invisible) frame
-      // once done; otherwise a finished doodle snaps back to the middle
-      fill: 'both'
+    launch(img, pick.width * (0.7 + Math.random() * 0.5), {
+      reach: 0.35 + Math.random() * 0.45,
+      duration: 3800 + Math.random() * 1400,
+      delay: Math.random() * 500,
+      spin: (Math.random() * 2 - 1) * 360,
+      keyframes: [{ opacity: 1, offset: 0.06 }, { opacity: 1, offset: 0.7 }]
     });
-    // Each doodle leaves the page as soon as its own flight ends
-    flight.finished.then(() => img.remove(), () => img.remove());
-    flights.push(flight);
   }
+
+  // Sparkles: smaller, twinkling (flickering) as they fly
+  for (let i = 0; i < 90; i++) {
+    const sparkle = document.createElement('div');
+    sparkle.className = 'sparkle';
+    sparkle.innerHTML = sparkleShape(SPARKLE_COLORS[i % SPARKLE_COLORS.length]);
+    launch(sparkle, 22 + Math.random() * 20, {
+      reach: 0.15 + Math.random() * 0.4,
+      duration: 2800 + Math.random() * 2000,
+      delay: Math.random() * 800,
+      spin: (Math.random() * 2 - 1) * 180,
+      keyframes: [
+        { opacity: 1, offset: 0.1 },
+        { opacity: 0.3, offset: 0.3 },
+        { opacity: 1, offset: 0.45 },
+        { opacity: 0.4, offset: 0.65 },
+        { opacity: 0.9, offset: 0.8 }
+      ]
+    });
+    // A quick pulse in size on top of the flight, for extra twinkle
+    sparkle.firstChild.animate(
+      [{ transform: 'scale(1)' }, { transform: 'scale(0.55)' }],
+      { duration: 250 + Math.random() * 350, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }
+    );
+  }
+
   document.body.append(layer);
   Promise.allSettled(flights.map(f => f.finished)).then(() => layer.remove());
 }
 
-// Only on the first page someone opens in a visit (moving between pages doesn't
-// replay it), and never for visitors who've asked their device to reduce motion
-let firstPageThisVisit = false;
-try {
-  firstPageThisVisit = !sessionStorage.getItem('doodleBurstPlayed');
-  sessionStorage.setItem('doodleBurstPlayed', '1');
-} catch (err) {
-  // Storage can be blocked (some private browsing modes); just skip the burst then
-}
-
-if (firstPageThisVisit && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-  // Hide the background until the burst starts, so it can fade in behind it
-  container.style.opacity = '0';
+if (root.classList.contains('intro')) {
   // Wait for the doodle images (so the burst isn't blank squares) and the fonts
   // (so the names are in their final spot), but no more than 2 seconds for images
   const imagesLoaded = Promise.all([...doodles.map(d => d.src), ...fillers].map(src => {
@@ -396,9 +494,11 @@ if (firstPageThisVisit && !matchMedia('(prefers-reduced-motion: reduce)').matche
   const giveUp = new Promise(resolve => setTimeout(resolve, 2000));
   Promise.all([document.fonts.ready, Promise.race([imagesLoaded, giveUp])]).then(() => {
     playWelcomeBurst();
+    // Fade the page (and its background doodles) in while the burst is underway
     setTimeout(() => {
-      container.style.transition = 'opacity 2.2s ease';
-      container.style.opacity = '';
-    }, 900);
+      root.classList.add('intro-reveal');
+      root.classList.remove('intro');
+      setTimeout(() => root.classList.remove('intro-reveal'), 3000);
+    }, 1200);
   });
 }

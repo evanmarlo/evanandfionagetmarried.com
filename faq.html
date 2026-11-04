@@ -3,6 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // First page of a visit: hide the page now, before anything shows, so it can fade
+  // in with the doodle burst (see doodles.js). Skipped for visitors who have asked
+  // their device to reduce motion.
+  try {
+    if (!sessionStorage.getItem("doodleBurstPlayed") && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      sessionStorage.setItem("doodleBurstPlayed", "1");
+      document.documentElement.classList.add("intro");
+      // Safety net: never leave the page hidden, even if something fails to load
+      setTimeout(() => document.documentElement.classList.remove("intro"), 6000);
+    }
+  } catch (err) {
+    // Storage can be blocked (some private browsing modes); the page just shows normally
+  }
+</script>
 <title>FAQ · Evan & Fiona 5.22.27</title>
 <meta name="description" content="Answers to common questions about Evan and Fiona's wedding, May 22, 2027 in Pocatello, Idaho.">
 <meta property="og:title" content="FAQ · Evan & Fiona's Wedding">
@@ -14,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@400;500;600&display=swap">
 <!-- After changing style.css or the doodle scripts, bump ?v= on them (in every page) so browsers load the new version right away -->
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=7">
 <link rel="icon" type="image/png" href="favicon.ico">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
@@ -31,6 +46,8 @@
     <a href="/registry">Registry</a>
     <a href="/faq" class="current">FAQ</a>
   </nav>
+
+  <div class="doodle-band" aria-hidden="true"></div>
 
   <main id="faq">
     <h2>Questions &amp; Answers</h2>
@@ -56,6 +73,8 @@
       <h3>How and when do I RSVP?</h3>
       <p>Please RSVP <a href="/rsvp">here</a> by April 22nd, 2027.</p>
     </div>
+
+    <div class="doodle-band" aria-hidden="true"></div>
 
     <div class="question">
       <h3>Where should I stay?</h3>
@@ -102,6 +121,8 @@
       <p>Your invitation will list everyone included, including any plus-ones. If a plus-one isn't listed, we kindly ask that you join us on your own. We appreciate your understanding and can't wait to celebrate with you!</p>
     </div>
 
+    <div class="doodle-band" aria-hidden="true"></div>
+
     <div class="question">
       <h3>Will there be alcohol?</h3>
       <p>Alcohol will not be served at the wedding.</p>
@@ -120,6 +141,8 @@
       <p>Whether you show up in a floor-length gown, a fabulous suit, your favorite Sunday-best outfit, or just a nice tie, there is no wrong way to dress. There may even be some dancing, so keep that in mind when choosing your outfit and shoes! Go as fancy or as whimsical as you'd like, but most importantly, wear whatever makes you feel your most fabulous and comfortable!</p>
     </div>
 
+    <div class="doodle-band" aria-hidden="true"></div>
+
     <div class="question">
       <h3>What is the schedule?</h3>
       <p>TBD</p>
@@ -135,6 +158,8 @@
     </div>
   </main>
 
+  <div class="doodle-band" aria-hidden="true"></div>
+
   <footer>
     <img src="heart.png" alt="">
     <p class="label"><span>Evan &amp; Fiona</span><span class="dot"> · </span><span>May 22, 2027 · Pocatello, ID</span></p>
@@ -142,7 +167,7 @@
 
   <div class="doodles" aria-hidden="true"></div>
 
-  <script src="doodle-masks.js?v=4"></script>
-  <script src="doodles.js?v=4"></script>
+  <script src="doodle-masks.js?v=7"></script>
+  <script src="doodles.js?v=7"></script>
 </body>
 </html>

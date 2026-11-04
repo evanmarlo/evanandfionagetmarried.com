@@ -3,6 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // First page of a visit: hide the page now, before anything shows, so it can fade
+  // in with the doodle burst (see doodles.js). Skipped for visitors who have asked
+  // their device to reduce motion.
+  try {
+    if (!sessionStorage.getItem("doodleBurstPlayed") && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      sessionStorage.setItem("doodleBurstPlayed", "1");
+      document.documentElement.classList.add("intro");
+      // Safety net: never leave the page hidden, even if something fails to load
+      setTimeout(() => document.documentElement.classList.remove("intro"), 6000);
+    }
+  } catch (err) {
+    // Storage can be blocked (some private browsing modes); the page just shows normally
+  }
+</script>
 <title>RSVP · Evan & Fiona 5.22.27</title>
 <meta name="description" content="RSVP for Evan and Fiona's wedding, May 22, 2027 in Pocatello, Idaho.">
 <meta property="og:title" content="RSVP · Evan & Fiona's Wedding">
@@ -14,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@400;500&display=swap">
 <!-- After changing style.css or the doodle scripts, bump ?v= on them (in every page) so browsers load the new version right away -->
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=7">
 <link rel="icon" type="image/png" href="favicon.ico">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
@@ -31,6 +46,8 @@
     <a href="/registry">Registry</a>
     <a href="/faq">FAQ</a>
   </nav>
+
+  <div class="doodle-band" aria-hidden="true"></div>
 
   <main id="rsvp">
     <h2>RSVP</h2>
@@ -121,6 +138,8 @@
       <p></p>
     </div>
   </main>
+
+  <div class="doodle-band" aria-hidden="true"></div>
 
   <footer>
     <img src="heart.png" alt="">
@@ -296,7 +315,7 @@
       }
     });
   </script>
-  <script src="doodle-masks.js?v=4"></script>
-  <script src="doodles.js?v=4"></script>
+  <script src="doodle-masks.js?v=7"></script>
+  <script src="doodles.js?v=7"></script>
 </body>
 </html>

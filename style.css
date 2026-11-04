@@ -100,20 +100,20 @@ nav a.current {
   width: 100%;
   height: 70vh;
   object-fit: cover;
-  /* White scalloped frame: a white mat whose outer edge is cut into
-     half-circles (a row of circles plus a solid inner rectangle).
-     --tile-w/--tile-h are set by the page script to sizes that divide the
-     frame exactly, so every edge ends on a whole scallop (Safari ignores
-     the `round` repeat that would otherwise do this). */
+  /* White scalloped frame: a white mat whose outer edge is cut into half-circles.
+     The script on the home page replaces this mask with one drawn exactly to the
+     frame's size (Safari breaks repeating tiles like this one apart on some iPhones),
+     so this version only shows if that script doesn't run. --scallop is the bump
+     radius, which the script reads too. */
   --scallop: 10px;
   padding: calc(var(--scallop) * 3);
   background: white;
   -webkit-mask:
     linear-gradient(#000 0 0) center / calc(100% - 2 * var(--scallop)) calc(100% - 2 * var(--scallop)) no-repeat,
-    radial-gradient(circle closest-side, #000 98%, transparent) 0 0 / var(--tile-w, calc(2 * var(--scallop))) var(--tile-h, calc(2 * var(--scallop))) round;
+    radial-gradient(circle closest-side, #000 98%, transparent) 0 0 / calc(2 * var(--scallop)) calc(2 * var(--scallop)) round;
   mask:
     linear-gradient(#000 0 0) center / calc(100% - 2 * var(--scallop)) calc(100% - 2 * var(--scallop)) no-repeat,
-    radial-gradient(circle closest-side, #000 98%, transparent) 0 0 / var(--tile-w, calc(2 * var(--scallop))) var(--tile-h, calc(2 * var(--scallop))) round;
+    radial-gradient(circle closest-side, #000 98%, transparent) 0 0 / calc(2 * var(--scallop)) calc(2 * var(--scallop)) round;
 }
 
 /* Scattered doodles (home page) */
@@ -131,6 +131,25 @@ nav a.current {
 @media (max-width: 600px) {
   .doodles {
     --doodle-size: 90px;
+  }
+}
+
+/* Doodle bands: on phones the content fills the width, leaving little room for
+   doodles, so these strips between sections are set aside for a row of them
+   (drawn by doodles.js). Hidden on wider screens, where the sides have room. */
+.doodle-band {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .doodle-band {
+    display: block;
+    height: 120px;  /* room for a tilted, swaying 90px doodle */
+  }
+
+  /* The RSVP button is normally tucked up toward the photo; keep it out of the band */
+  .doodle-band + .home-cta {
+    margin-top: 0;
   }
 }
 
@@ -163,9 +182,31 @@ nav a.current {
   pointer-events: none;
 }
 
-.doodle-burst img {
+.doodle-burst img,
+.doodle-burst .sparkle {
   position: absolute;
   will-change: transform, opacity;
+}
+
+.doodle-burst .sparkle {
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9));
+}
+
+.doodle-burst .sparkle svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* First page of a visit: everything except the burst starts hidden ("intro",
+   set by the script at the top of each page), then fades in together
+   ("intro-reveal") while the burst is underway */
+html.intro body > *:not(.doodle-burst) {
+  opacity: 0;
+}
+
+html.intro-reveal body > *:not(.doodle-burst) {
+  transition: opacity 2.5s ease;
 }
 
 /* Doodles added after the page loads (when content changes size) fade in */
