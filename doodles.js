@@ -335,7 +335,7 @@ function playWelcomeBurst() {
   ];
 
   const flights = [];
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 90; i++) {
     const pick = choices[i % choices.length];
     const width = pick.width * (0.7 + Math.random() * 0.5);
     const img = document.createElement('img');
@@ -352,17 +352,22 @@ function playWelcomeBurst() {
     const dx = Math.cos(angle) * distance;
     const dy = Math.sin(angle) * distance;
     const spin = (Math.random() * 2 - 1) * 360;
-    flights.push(img.animate([
+    const flight = img.animate([
       { transform: 'translate(0, 0) scale(0.2) rotate(0deg)', opacity: 0 },
-      { opacity: 1, offset: 0.08 },
-      { opacity: 1, offset: 0.65 },
+      { opacity: 1, offset: 0.06 },
+      { opacity: 1, offset: 0.7 },
       { transform: `translate(${dx}px, ${dy}px) scale(1) rotate(${spin}deg)`, opacity: 0 }
     ], {
-      duration: 1500 + Math.random() * 700,
-      delay: Math.random() * 150,
-      easing: 'cubic-bezier(0.15, 0.85, 0.35, 1)',  // fast pop, then glide
-      fill: 'backwards'
-    }));
+      duration: 2600 + Math.random() * 1000,
+      delay: Math.random() * 350,
+      easing: 'cubic-bezier(0.2, 0.75, 0.35, 1)',  // quick pop, then a long glide
+      // Hold the first frame while waiting to start and the last (invisible) frame
+      // once done; otherwise a finished doodle snaps back to the middle
+      fill: 'both'
+    });
+    // Each doodle leaves the page as soon as its own flight ends
+    flight.finished.then(() => img.remove(), () => img.remove());
+    flights.push(flight);
   }
   document.body.append(layer);
   Promise.allSettled(flights.map(f => f.finished)).then(() => layer.remove());
@@ -392,8 +397,8 @@ if (firstPageThisVisit && !matchMedia('(prefers-reduced-motion: reduce)').matche
   Promise.all([document.fonts.ready, Promise.race([imagesLoaded, giveUp])]).then(() => {
     playWelcomeBurst();
     setTimeout(() => {
-      container.style.transition = 'opacity 1.4s ease';
+      container.style.transition = 'opacity 2.2s ease';
       container.style.opacity = '';
-    }, 500);
+    }, 900);
   });
 }
