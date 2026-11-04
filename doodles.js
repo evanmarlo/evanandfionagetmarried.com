@@ -1,5 +1,6 @@
 // Scatters doodles around the page behind everything, keeping clear of the
 // header text, the page's main content, the footer and the home page photo.
+// The first page opened in a visit also gets a burst of doodles (see the end).
 // Needs doodle-masks.js loaded first and a <div class="doodles"> on the page.
 
 // Doodle images are found next to this script, so they load from any page,
@@ -311,3 +312,88 @@ addEventListener('resize', () => {
   const pageFillsWindow = lastHeight <= lastWindowHeight + 1;
   if (pageFillsWindow && Math.abs(innerHeight - lastWindowHeight) > 1) scheduleLayout();
 });
+
+// ---------- Welcome burst ----------
+
+// Doodles explode out from the names, spinning outward and fading off the edges,
+// while the background doodles fade in behind them
+function playWelcomeBurst() {
+  const names = document.querySelector('header h1');
+  if (!names) return;
+  const origin = names.getBoundingClientRect();
+  const originX = origin.left + origin.width / 2;
+  const originY = origin.top + origin.height / 2;
+  const size = parseFloat(getComputedStyle(container).getPropertyValue('--doodle-size'));
+  const screenDiagonal = Math.hypot(innerWidth, innerHeight);
+
+  const layer = document.createElement('div');
+  layer.className = 'doodle-burst';
+  layer.setAttribute('aria-hidden', 'true');
+  const choices = [
+    ...doodles.map(d => ({ src: d.src, width: size * (d.scale || 1) * 0.8 })),
+    ...fillers.map(src => ({ src, width: size * 0.35 }))
+  ];
+
+  const flights = [];
+  for (let i = 0; i < 50; i++) {
+    const pick = choices[i % choices.length];
+    const width = pick.width * (0.7 + Math.random() * 0.5);
+    const img = document.createElement('img');
+    img.src = new URL(pick.src, DOODLE_FOLDER).href;
+    img.alt = '';
+    img.style.width = img.style.height = width + 'px';
+    img.style.left = originX - width / 2 + 'px';
+    img.style.top = originY - width / 2 + 'px';
+    layer.append(img);
+
+    // A random direction, far enough to reach (or pass) the edge of the screen
+    const angle = Math.random() * Math.PI * 2;
+    const distance = screenDiagonal * (0.35 + Math.random() * 0.45);
+    const dx = Math.cos(angle) * distance;
+    const dy = Math.sin(angle) * distance;
+    const spin = (Math.random() * 2 - 1) * 360;
+    flights.push(img.animate([
+      { transform: 'translate(0, 0) scale(0.2) rotate(0deg)', opacity: 0 },
+      { opacity: 1, offset: 0.08 },
+      { opacity: 1, offset: 0.65 },
+      { transform: `translate(${dx}px, ${dy}px) scale(1) rotate(${spin}deg)`, opacity: 0 }
+    ], {
+      duration: 1500 + Math.random() * 700,
+      delay: Math.random() * 150,
+      easing: 'cubic-bezier(0.15, 0.85, 0.35, 1)',  // fast pop, then glide
+      fill: 'backwards'
+    }));
+  }
+  document.body.append(layer);
+  Promise.allSettled(flights.map(f => f.finished)).then(() => layer.remove());
+}
+
+// Only on the first page someone opens in a visit (moving between pages doesn't
+// replay it), and never for visitors who've asked their device to reduce motion
+let firstPageThisVisit = false;
+try {
+  firstPageThisVisit = !sessionStorage.getItem('doodleBurstPlayed');
+  sessionStorage.setItem('doodleBurstPlayed', '1');
+} catch (err) {
+  // Storage can be blocked (some private browsing modes); just skip the burst then
+}
+
+if (firstPageThisVisit && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  // Hide the background until the burst starts, so it can fade in behind it
+  container.style.opacity = '0';
+  // Wait for the doodle images (so the burst isn't blank squares) and the fonts
+  // (so the names are in their final spot), but no more than 2 seconds for images
+  const imagesLoaded = Promise.all([...doodles.map(d => d.src), ...fillers].map(src => {
+    const img = new Image();
+    img.src = new URL(src, DOODLE_FOLDER).href;
+    return img.decode().catch(() => {});
+  }));
+  const giveUp = new Promise(resolve => setTimeout(resolve, 2000));
+  Promise.all([document.fonts.ready, Promise.race([imagesLoaded, giveUp])]).then(() => {
+    playWelcomeBurst();
+    setTimeout(() => {
+      container.style.transition = 'opacity 1.4s ease';
+      container.style.opacity = '';
+    }, 500);
+  });
+}

@@ -153,6 +153,21 @@ nav a.current {
   --sway: 15deg;
 }
 
+/* Welcome burst: doodles flying out over the page on the first visit.
+   It sits above everything but can't be clicked, so nothing is blocked. */
+.doodle-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.doodle-burst img {
+  position: absolute;
+  will-change: transform, opacity;
+}
+
 /* Doodles added after the page loads (when content changes size) fade in */
 .doodles img.appear {
   animation: dance 3.5s ease-in-out infinite alternate, doodle-appear 0.8s ease-out;
@@ -568,6 +583,7 @@ button.button:disabled {
 
 .question h3 {
   margin-bottom: 0.6rem;
+  font-weight: 600;  /* bold Jost is loaded on the FAQ page */
 }
 
 .question p {
