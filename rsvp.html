@@ -29,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@400;500&display=swap">
 <!-- After changing style.css or the doodle scripts, bump ?v= on them (in every page) so browsers load the new version right away -->
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 <link rel="icon" type="image/png" href="favicon.ico">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
@@ -53,9 +53,13 @@
     <h2>RSVP</h2>
     <p class="rsvp-deadline">Kindly respond by April 22nd, 2027</p>
 
+    <!-- Shown instead of the form until RSVPs open (see RSVP_OPENS below) -->
+    <p class="rsvp-closed" hidden>Sorry! RSVPs will open starting February 21st, and we ask that you kindly RSVP by April 22nd.</p>
+
     <!-- Step 1: find the invitation. The guest list stays in the Google Sheet;
-         the script only sends back invitations matching a full name. -->
-    <form id="find-form" novalidate>
+         the script only sends back invitations matching a full name.
+         Starts hidden; the script below shows it once RSVPs are open. -->
+    <form id="find-form" novalidate hidden>
       <div class="field">
         <label class="label" for="find-name">Find your invitation</label>
         <div class="search-row">
@@ -165,6 +169,22 @@
     const statusLine = form.querySelector('.form-status');
     const submitButton = form.querySelector('button[type="submit"]');
 
+    // RSVPs open at midnight Mountain time (Pocatello) on February 21st, 2027.
+    // Until then the page shows a message instead of the form. The Google Script
+    // checks the same date with Google's clock, so nobody can RSVP early by
+    // changing the date on their device. Keep the two dates the same.
+    const RSVP_OPENS = new Date('2027-02-21T00:00:00-07:00');
+
+    function showClosed() {
+      document.querySelector('.rsvp-deadline').hidden = true;
+      document.querySelector('.rsvp-closed').hidden = false;
+      findForm.hidden = true;
+      form.hidden = true;
+    }
+
+    if (Date.now() < RSVP_OPENS) showClosed();
+    else findForm.hidden = false;
+
     let seats = 1;
 
     function setStatus(line, message, isError) {
@@ -193,6 +213,8 @@
       findButton.disabled = true;
       try {
         const reply = await callScript({ action: 'search', name: name });
+        // The device's clock says RSVPs are open, but Google's says not yet
+        if (reply.error === 'not-open') return showClosed();
         if (!reply.ok) {
           const messages = {
             'name': 'Please enter your name.',
@@ -309,13 +331,14 @@
         form.hidden = true;
         thanks.hidden = false;
       } catch (err) {
+        if (err.message === 'not-open') return showClosed();
         setStatus(statusLine, 'Something went wrong sending your RSVP. Please try again in a moment, or reach out to us (our numbers are on the FAQ page).', true);
         submitButton.disabled = false;
         submitButton.textContent = 'Send RSVP';
       }
     });
   </script>
-  <script src="doodle-masks.js?v=7"></script>
-  <script src="doodles.js?v=7"></script>
+  <script src="doodle-masks.js?v=8"></script>
+  <script src="doodles.js?v=8"></script>
 </body>
 </html>

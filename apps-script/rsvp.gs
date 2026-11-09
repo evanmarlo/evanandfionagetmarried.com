@@ -23,6 +23,12 @@
 const RSVP_TAB = 'RSVP';
 const GUEST_TAB = 'Guest List';
 
+// RSVPs open at midnight Mountain time (Pocatello) on February 21st, 2027. Until then,
+// searches and RSVPs are turned away. The RSVP page checks the same date to show its
+// "RSVPs will open" message, but this check uses Google's clock, so changing the date
+// on a phone or computer can't get around it. Keep the two dates the same.
+const RSVP_OPENS = new Date('2027-02-21T00:00:00-07:00');
+
 // Guest List layout: headers on row 22, one invitation per row below that
 const GUEST_HEADER_ROW = 22;
 const COL_NAME = 3;        // C: name(s) on the invitation, e.g. "Susie & Patrick Johndrow"
@@ -55,6 +61,8 @@ function doPost(e) {
     // Pretend it worked so the bot moves on.
     if (p.website) return reply({ ok: true, results: [] });
 
+    if (new Date() < RSVP_OPENS) return reply({ ok: false, error: 'not-open' });
+
     if (p.action === 'search') return search(p.name);
     return saveRsvp(p);
   } catch (err) {
@@ -68,7 +76,7 @@ function doPost(e) {
 
 // Visiting the web app URL in a browser shows this, which confirms the deployment works
 function doGet() {
-  return ContentService.createTextOutput('RSVP endpoint is running, with guest list search (full or single names).');
+  return ContentService.createTextOutput('RSVP endpoint is running. RSVPs open February 21st, 2027.');
 }
 
 // ---------- Search ----------

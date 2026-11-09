@@ -360,6 +360,15 @@ footer .label {
   margin-bottom: 2.5rem;
 }
 
+/* Message shown until RSVPs open */
+.rsvp-closed {
+  max-width: 30rem;
+  margin: 1.5rem auto 0;
+  text-align: center;
+  font-size: 1.35rem;
+  line-height: 1.6;
+}
+
 .field {
   margin-bottom: 1.8rem;
   border: 0;  /* fieldsets have a border by default */
